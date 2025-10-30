@@ -1,0 +1,133 @@
+rss_sources:
+  # ─────────── 高权重核心源（每分钟） ───────────
+  high_priority:
+    - name: "FederalReserve"
+      url: "https://www.federalreserve.gov/feeds/press_all.xml"
+      category: "central_bank"
+      region: "US"
+      weight: 10
+      interval: 60
+      desc: "美联储新闻稿与政策声明"
+
+    - name: "SEC"
+      url: "https://www.sec.gov/news/pressreleases.rss"
+      category: "regulation"
+      region: "US"
+      weight: 10
+      interval: 60
+      desc: "美国证监会监管公告、诉讼、执法动态"
+
+    - name: "PBOC"
+      url: "http://www.pbc.gov.cn/goutongjiaoliu/113456/113469/index.html"
+      category: "central_bank"
+      region: "CN"
+      weight: 10
+      interval: 60
+      desc: "中国人民银行公告、金融统计、政策变化"
+
+    - name: "HKEX"
+      url: "https://www.hkex.com.hk/News/News-Release/News-Release?format=rss"
+      category: "company"
+      region: "HK"
+      weight: 9
+      interval: 60
+      desc: "香港交易所公告、上市公司新闻"
+
+  # ─────────── 中权重重要源（每5分钟） ───────────
+  medium_priority:
+    - name: "BLS_US"
+      url: "https://www.bls.gov/bls/newsrels.htm"
+      category: "macro"
+      region: "US"
+      weight: 9
+      interval: 300
+      desc: "美国劳工统计局 - 非农就业、CPI、PPI等权威数据"
+
+    - name: "ECB"
+      url: "https://www.ecb.europa.eu/press/pr/date/2024/html/index.en.html"
+      category: "central_bank"
+      region: "EU"
+      weight: 9
+      interval: 300
+      desc: "欧洲央行新闻、货币政策决议"
+
+    - name: "NASDAQ"
+      url: "https://www.nasdaq.com/feed/rssoutbound?category=All"
+      category: "company"
+      region: "US"
+      weight: 9
+      interval: 300
+      desc: "纳斯达克上市公司公告与市场新闻"
+
+    - name: "NYSE"
+      url: "https://www.nyse.com/rss"
+      category: "company"
+      region: "US"
+      weight: 8
+      interval: 300
+      desc: "纽交所新闻稿与公司动态"
+
+    - name: "IMF"
+      url: "https://www.imf.org/en/news"
+      category: "macro"
+      region: "Global"
+      weight: 8
+      interval: 300
+      desc: "国际货币基金组织 - 声明与研究报告"
+
+  # ─────────── 低权重信息源（每15分钟） ───────────
+  low_priority:
+    - name: "BEA_US"
+      url: "https://www.bea.gov/news/releases"
+      category: "macro"
+      region: "US"
+      weight: 7
+      interval: 900
+      desc: "美国经济分析局 - GDP、贸易、投资统计"
+
+    - name: "BOE"
+      url: "https://www.bankofengland.co.uk/news"
+      category: "central_bank"
+      region: "UK"
+      weight: 8
+      interval: 900
+      desc: "英国央行新闻、利率公告、监管政策"
+
+    - name: "BOJ"
+      url: "https://www.boj.or.jp/en/"
+      category: "central_bank"
+      region: "JP"
+      weight: 8
+      interval: 900
+      desc: "日本央行新闻与货币政策"
+
+    - name: "OECD"
+      url: "https://www.oecd.org/newsroom/"
+      category: "macro"
+      region: "Global"
+      weight: 6
+      interval: 900
+      desc: "OECD 经济合作组织 - 全球成员国经济报告"
+
+    - name: "WorldBank"
+      url: "https://www.worldbank.org/en/news"
+      category: "macro"
+      region: "Global"
+      weight: 6
+      interval: 900
+      desc: "世界银行新闻与经济发展数据"
+
+    - name: "Brookings"
+      url: "https://www.brookings.edu/topic/economy/"
+      category: "research"
+      region: "US"
+      weight: 6
+      interval: 900
+      desc: "布鲁金斯学会经济研究报告"
+
+# 全局配置
+global_config:
+  default_timeout: 30
+  max_retries: 3
+  user_agent: "AI-Invest-Bot/1.0"
+  respect_robots_txt: true

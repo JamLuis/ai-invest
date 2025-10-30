@@ -1,0 +1,206 @@
+openapi: 3.0.0
+info:
+  title: Finance News API
+  description: 财经新闻数据查询服务，提供从多个RSS源收集的财经新闻数据的检索功能
+  version: 1.0.0
+  contact:
+    name: AI Investment Team
+    email: support@ai-invest.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发服务器
+  - url: https://api.ai-invest.com
+    description: 生产环境服务器
+
+paths:
+  /news:
+    get:
+      summary: 获取新闻列表
+      description: 获取财经新闻列表，支持关键词搜索和结果数量限制
+      operationId: listNews
+      tags:
+        - 新闻
+      parameters:
+        - name: q
+          in: query
+          description: 搜索关键词，在新闻标题和摘要中进行模糊匹配
+          required: false
+          schema:
+            type: string
+            example: "SEC"
+        - name: limit
+          in: query
+          description: 返回结果的最大数量
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+            example: 10
+      responses:
+        "200":
+          description: 成功返回新闻列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NewsArticle"
+              examples:
+                default:
+                  summary: 默认新闻列表
+                  value:
+                    - id: 1
+                      source: "https://www.sec.gov/news/pressreleases.rss"
+                      url: "https://www.sec.gov/news/press-release/2024-123"
+                      title: "SEC Announces New Regulatory Framework"
+                      summary: "The Securities and Exchange Commission today announced..."
+                      published_at: "2024-10-30T10:30:00+00:00"
+                    - id: 2
+                      source: "https://www.hkex.com.hk/eng/newscalc/hkexnews.xml"
+                      url: "https://www.hkex.com.hk/News/Market-Communications/2024/241030news"
+                      title: "Hong Kong Exchanges and Clearing Limited Updates"
+                      summary: "Hong Kong Exchanges and Clearing Limited today released..."
+                      published_at: "2024-10-30T09:15:00+00:00"
+                search_result:
+                  summary: 搜索结果示例
+                  value:
+                    - id: 5
+                      source: "https://www.sec.gov/news/pressreleases.rss"
+                      url: "https://www.sec.gov/news/press-release/2024-125"
+                      title: "SEC Files Charges Against Investment Advisor"
+                      summary: "The SEC today filed charges against..."
+                      published_at: "2024-10-30T08:45:00+00:00"
+        "400":
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                invalid_limit:
+                  summary: 无效的limit参数
+                  value:
+                    detail: "Query parameter 'limit' must be between 1 and 1000"
+        "500":
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                database_error:
+                  summary: 数据库连接错误
+                  value:
+                    detail: "Database connection failed"
+
+  /health:
+    get:
+      summary: 健康检查
+      description: 检查API服务的健康状态
+      operationId: healthCheck
+      tags:
+        - 系统
+      responses:
+        "200":
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-10-30T12:00:00+00:00"
+
+components:
+  schemas:
+    NewsArticle:
+      type: object
+      description: 新闻文章对象
+      required:
+        - id
+        - source
+        - url
+        - title
+        - summary
+        - published_at
+      properties:
+        id:
+          type: integer
+          description: 新闻唯一标识符
+          example: 1
+        source:
+          type: string
+          format: uri
+          description: 新闻来源RSS链接
+          example: "https://www.sec.gov/news/pressreleases.rss"
+        url:
+          type: string
+          format: uri
+          description: 新闻原文链接
+          example: "https://www.sec.gov/news/press-release/2024-123"
+        title:
+          type: string
+          description: 新闻标题
+          example: "SEC Announces New Regulatory Framework"
+        summary:
+          type: string
+          description: 新闻摘要
+          example: "The Securities and Exchange Commission today announced a new regulatory framework..."
+        published_at:
+          type: string
+          format: date-time
+          description: 新闻发布时间（ISO 8601格式）
+          example: "2024-10-30T10:30:00+00:00"
+
+    Error:
+      type: object
+      description: 错误响应对象
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: 错误详细信息
+          example: "An error occurred while processing your request"
+
+  examples:
+    SECNews:
+      summary: SEC新闻示例
+      value:
+        id: 1
+        source: "https://www.sec.gov/news/pressreleases.rss"
+        url: "https://www.sec.gov/news/press-release/2024-123"
+        title: "SEC Announces New Regulatory Framework for Digital Assets"
+        summary: "The Securities and Exchange Commission today announced a comprehensive new regulatory framework for digital assets, aimed at protecting investors while fostering innovation in the cryptocurrency space."
+        published_at: "2024-10-30T10:30:00+00:00"
+
+    HKEXNews:
+      summary: HKEX新闻示例
+      value:
+        id: 2
+        source: "https://www.hkex.com.hk/eng/newscalc/hkexnews.xml"
+        url: "https://www.hkex.com.hk/News/Market-Communications/2024/241030news"
+        title: "Hong Kong Exchanges Launches New ESG Data Platform"
+        summary: "Hong Kong Exchanges and Clearing Limited today launched a new Environmental, Social and Governance (ESG) data platform to help investors make more informed decisions."
+        published_at: "2024-10-30T09:15:00+00:00"
+
+tags:
+  - name: 新闻
+    description: 新闻相关的API接口
+  - name: 系统
+    description: 系统状态和健康检查相关的API接口
+
+externalDocs:
+  description: 完整的API文档
+  url: https://github.com/your-org/ai-invest/blob/main/docs/api/README.md

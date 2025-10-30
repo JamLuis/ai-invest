@@ -1,0 +1,166 @@
+{
+  "info": {
+    "name": "Finance News API",
+    "description": "财经新闻数据查询服务API集合",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "获取新闻列表",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/news?limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["news"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "返回结果数量限制"
+            }
+          ]
+        },
+        "description": "获取最新的财经新闻列表"
+      },
+      "response": [
+        {
+          "name": "成功响应",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/news?limit=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["news"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "content-type",
+              "value": "application/json"
+            }
+          ],
+          "body": "[\n  {\n    \"id\": 1,\n    \"source\": \"https://www.sec.gov/news/pressreleases.rss\",\n    \"url\": \"https://www.sec.gov/news/press-release/2024-123\",\n    \"title\": \"SEC Announces New Regulatory Framework\",\n    \"summary\": \"The Securities and Exchange Commission today announced...\",\n    \"published_at\": \"2024-10-30T10:30:00+00:00\"\n  },\n  {\n    \"id\": 2,\n    \"source\": \"https://www.hkex.com.hk/eng/newscalc/hkexnews.xml\",\n    \"url\": \"https://www.hkex.com.hk/News/Market-Communications/2024/241030news\",\n    \"title\": \"Hong Kong Exchanges and Clearing Limited Updates\",\n    \"summary\": \"Hong Kong Exchanges and Clearing Limited today released...\",\n    \"published_at\": \"2024-10-30T09:15:00+00:00\"\n  }\n]"
+        }
+      ]
+    },
+    {
+      "name": "搜索新闻 - SEC",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/news?q=SEC&limit=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["news"],
+          "query": [
+            {
+              "key": "q",
+              "value": "SEC",
+              "description": "搜索关键词"
+            },
+            {
+              "key": "limit",
+              "value": "5",
+              "description": "返回结果数量限制"
+            }
+          ]
+        },
+        "description": "搜索包含SEC关键词的新闻"
+      },
+      "response": []
+    },
+    {
+      "name": "搜索新闻 - 香港交易所",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/news?q=香港交易所&limit=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["news"],
+          "query": [
+            {
+              "key": "q",
+              "value": "香港交易所",
+              "description": "搜索关键词"
+            },
+            {
+              "key": "limit",
+              "value": "5",
+              "description": "返回结果数量限制"
+            }
+          ]
+        },
+        "description": "搜索包含'香港交易所'关键词的新闻"
+      },
+      "response": []
+    },
+    {
+      "name": "获取大量新闻",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/news?limit=100",
+          "host": ["{{baseUrl}}"],
+          "path": ["news"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "100",
+              "description": "返回结果数量限制"
+            }
+          ]
+        },
+        "description": "获取更多新闻数据用于测试"
+      },
+      "response": []
+    },
+    {
+      "name": "搜索新闻 - regulatory",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/news?q=regulatory&limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["news"],
+          "query": [
+            {
+              "key": "q",
+              "value": "regulatory",
+              "description": "搜索关键词"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "返回结果数量限制"
+            }
+          ]
+        },
+        "description": "搜索包含'regulatory'关键词的新闻"
+      },
+      "response": []
+    }
+  ]
+}
