@@ -66,6 +66,30 @@ class EnhancedRSSProducer:
                     "weight": 6
                 })
         
+        # 研究源
+        research_feeds = os.getenv("FEEDS_RESEARCH", "").split(",")
+        research_interval = int(os.getenv("POLL_INTERVAL_RESEARCH", "1800"))
+        for feed_url in research_feeds:
+            if feed_url.strip():
+                configs.append({
+                    "urls": [feed_url.strip()],
+                    "interval": research_interval,
+                    "priority": "research",
+                    "weight": 4
+                })
+        
+        # 国际源
+        international_feeds = os.getenv("FEEDS_INTERNATIONAL", "").split(",")
+        international_interval = int(os.getenv("POLL_INTERVAL_INTERNATIONAL", "3600"))
+        for feed_url in international_feeds:
+            if feed_url.strip():
+                configs.append({
+                    "urls": [feed_url.strip()],
+                    "interval": international_interval,
+                    "priority": "international",
+                    "weight": 3
+                })
+        
         # 如果没有配置新的优先级源，使用原有配置
         if not configs:
             legacy_feeds = os.getenv("FEEDS", "").split(",")
@@ -143,16 +167,35 @@ class EnhancedRSSProducer:
     def _detect_category(self, url: str) -> str:
         """根据URL检测新闻源类别"""
         url_lower = url.lower()
+        
+        # 央行类
         if any(keyword in url_lower for keyword in ["fed", "federalreserve", "ecb", "boj", "pbc"]):
             return "central_bank"
+        
+        # 监管机构类
         elif any(keyword in url_lower for keyword in ["sec", "regulation", "cftc"]):
             return "regulation"
+        
+        # 交易所类
         elif any(keyword in url_lower for keyword in ["nasdaq", "nyse", "hkex"]):
             return "exchange"
+        
+        # 宏观经济类
         elif any(keyword in url_lower for keyword in ["bls", "bea", "census", "oecd", "imf"]):
             return "macro"
+        
+        # 研究机构类
         elif any(keyword in url_lower for keyword in ["goldman", "morgan", "brookings"]):
             return "research"
+        
+        # 国际财经媒体类
+        elif any(keyword in url_lower for keyword in ["investing.com", "reuters", "bloomberg"]):
+            return "international_finance"
+        
+        # 通用新闻类
+        elif any(keyword in url_lower for keyword in ["news", "finance", "markets"]):
+            return "general_finance"
+        
         else:
             return "general"
 
