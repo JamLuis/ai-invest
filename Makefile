@@ -15,6 +15,24 @@ deps:
 migrate:
 	docker exec -i ai-invest-postgres-1 psql -U finance -d finance < src/db/schema.sql
 
+# 智能数据库初始化（仅当表不存在时才运行）
+migrate-if-needed:
+	@if ! docker exec ai-invest-postgres-1 psql -U finance -d finance -c "SELECT 1 FROM articles LIMIT 1;" >/dev/null 2>&1; then \
+		echo "初始化数据库schema..."; \
+		docker exec -i ai-invest-postgres-1 psql -U finance -d finance < src/db/schema.sql; \
+	else \
+		echo "数据库已存在，跳过初始化"; \
+	fi
+
+# 强制重置数据库（清空所有数据）
+reset-db:
+	@echo "⚠️  警告：这将清空所有数据！"
+	@read -p "确认要重置数据库吗？(y/N): " confirm && [ "$$confirm" = "y" ] || { echo "操作已取消"; exit 1; }
+	@echo "重置数据库..."
+	@docker exec ai-invest-postgres-1 psql -U finance -d finance -c "DROP TABLE IF EXISTS articles;"
+	@docker exec -i ai-invest-postgres-1 psql -U finance -d finance < src/db/schema.sql
+	@echo "数据库已重置"
+
 # 单独服务启动（需要在虚拟环境中运行）
 api:
 	. venv/bin/activate && uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
@@ -33,7 +51,7 @@ db:
 	. venv/bin/activate && python3 -m src.consumer.db_consumer
 
 # 一键启动/停止
-start: check-deps up wait-postgres migrate start-services
+start: check-deps up wait-postgres migrate-if-needed start-services
 	@echo "🚀 AI投资财经资讯数据管道启动完成！"
 	@echo "API地址: http://localhost:8000"
 	@echo "使用 'make status' 查看服务状态"
@@ -76,7 +94,7 @@ wait-postgres:
 start-services:
 	@echo "启动应用服务..."
 	@mkdir -p logs
-	@. venv/bin/activate && nohup python3 -m src.producer.rss_producer > logs/rss_producer.log 2>&1 & echo $$! > logs/rss_producer.pid
+	@. venv/bin/activate && nohup python3 -m src.producer.enhanced_rss_producer > logs/rss_producer.log 2>&1 & echo $$! > logs/rss_producer.pid
 	@sleep 2
 	@. venv/bin/activate && nohup python3 -m src.consumer.parser_consumer > logs/parser_consumer.log 2>&1 & echo $$! > logs/parser_consumer.pid
 	@sleep 2
