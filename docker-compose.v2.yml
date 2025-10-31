@@ -1,0 +1,172 @@
+# AI-Invest V2 Docker配置
+# 支持newspaper集成、数据持久化、智能分析
+
+services:
+  # PostgreSQL数据库 V2
+  postgres_v2:
+    image: postgres:16
+    container_name: ai-invest-postgres-v2
+    environment:
+      POSTGRES_DB: finance_v2
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+    ports:
+      - "5433:5432" # 使用不同端口避免冲突
+    volumes:
+      - postgres_v2_data:/var/lib/postgresql/data
+      - ./src/db/schema_v2.sql:/docker-entrypoint-initdb.d/schema_v2.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance -d finance_v2"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Kafka (继续使用，用于日志和事件流)
+  kafka_v2:
+    image: apache/kafka:3.9.0
+    container_name: ai-invest-kafka-v2
+    ports:
+      - "9093:9092" # 使用不同端口
+    environment:
+      KAFKA_LISTENERS: CONTROLLER://localhost:9091,HOST://0.0.0.0:9092,DOCKER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9093,DOCKER://kafka_v2:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,DOCKER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9091
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+    volumes:
+      - kafka_v2_data:/var/lib/kafka/data
+
+  # AI-Invest V2 主应用
+  ai-invest-v2:
+    build:
+      context: .
+      dockerfile: Dockerfile.v2
+    container_name: ai-invest-app-v2
+    depends_on:
+      postgres_v2:
+        condition: service_healthy
+      kafka_v2:
+        condition: service_started
+    environment:
+      # 数据库配置
+      POSTGRES_HOST: postgres_v2
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: finance_v2
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+
+      # Kafka配置
+      KAFKA_BOOTSTRAP: kafka_v2:9093
+
+      # 应用配置
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+
+      # 抓取配置
+      MAX_CONCURRENT_REQUESTS: 10
+      RATE_LIMIT_DELAY: 1.0
+      REQUEST_TIMEOUT: 30
+
+      # 归档配置
+      ARCHIVE_BASE_PATH: /app/data/archives
+      ARCHIVE_AFTER_DAYS: 90
+      CLEANUP_AFTER_DAYS: 365
+
+    ports:
+      - "8001:8000" # API端口映射
+    volumes:
+      - ./data/archives:/app/data/archives # 归档文件持久化
+      - ./logs:/app/logs # 日志持久化
+      - ./config:/app/config # 配置文件
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 新闻调度器（独立服务）
+  news-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.v2
+    container_name: ai-invest-scheduler-v2
+    depends_on:
+      postgres_v2:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres_v2
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: finance_v2
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+
+      # 调度配置
+      HIGH_PRIORITY_INTERVAL: 1800 # 30分钟
+      MEDIUM_PRIORITY_INTERVAL: 3600 # 1小时
+      LOW_PRIORITY_INTERVAL: 7200 # 2小时
+
+    command: ["python", "-m", "src.news_scheduler"]
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # 归档清理服务（定时任务）
+  archive-cleaner:
+    build:
+      context: .
+      dockerfile: Dockerfile.v2
+    container_name: ai-invest-cleaner-v2
+    depends_on:
+      postgres_v2:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres_v2
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: finance_v2
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+
+      ARCHIVE_BASE_PATH: /app/data/archives
+      ARCHIVE_AFTER_DAYS: 90
+      CLEANUP_AFTER_DAYS: 365
+
+    command: >
+      sh -c "while true; do 
+        python -m src.archive_manager --action full; 
+        sleep 86400; 
+      done"
+    volumes:
+      - ./data/archives:/app/data/archives
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Nginx反向代理（可选）
+  nginx:
+    image: nginx:alpine
+    container_name: ai-invest-nginx-v2
+    depends_on:
+      - ai-invest-v2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    restart: unless-stopped
+
+# 数据卷配置
+volumes:
+  postgres_v2_data:
+    driver: local
+  kafka_v2_data:
+    driver: local
+
+# 网络配置
+networks:
+  default:
+    name: ai-invest-v2-network

@@ -1,0 +1,266 @@
+# AI-Invest V2 Makefile
+# 支持newspaper集成、智能分析、归档管理
+
+.PHONY: v2-up v2-down v2-build v2-logs v2-status v2-test v2-clean v2-archive v2-crawl
+
+# ======================
+# V2版本 - 基础服务管理
+# ======================
+
+v2-build:
+	@echo "🔨 构建AI-Invest V2镜像..."
+	docker-compose -f docker-compose.v2.yml build
+
+v2-up:
+	@echo "🚀 启动AI-Invest V2服务..."
+	docker-compose -f docker-compose.v2.yml up -d
+	@echo "等待服务启动..."
+	@sleep 10
+	@make v2-status
+
+v2-down:
+	@echo "🛑 停止AI-Invest V2服务..."
+	docker-compose -f docker-compose.v2.yml down
+
+v2-restart: v2-down
+	@sleep 3
+	@make v2-up
+
+# ======================
+# V2版本 - 服务状态和监控
+# ======================
+
+v2-status:
+	@echo "=== AI-Invest V2 服务状态 ==="
+	@docker-compose -f docker-compose.v2.yml ps
+	@echo ""
+	@echo "=== 服务健康检查 ==="
+	@if curl -s -f "http://localhost:8001/health" > /dev/null 2>&1; then \
+		echo "✅ API服务正常 (http://localhost:8001)"; \
+	else \
+		echo "❌ API服务不可用"; \
+	fi
+	@echo ""
+	@echo "=== 数据库统计 ==="
+	@docker exec ai-invest-postgres-v2 psql -U finance -d finance_v2 -c "SELECT 'articles_v2' as table_name, COUNT(*) as count FROM articles_v2 UNION SELECT 'news_sources', COUNT(*) FROM news_sources;" 2>/dev/null || echo "数据库连接失败"
+
+v2-logs:
+	@if [ -n "$(SERVICE)" ]; then \
+		docker-compose -f docker-compose.v2.yml logs -f $(SERVICE); \
+	else \
+		echo "查看指定服务日志: make v2-logs SERVICE=ai-invest-v2|news-scheduler|archive-cleaner"; \
+		echo "查看所有服务日志:"; \
+		docker-compose -f docker-compose.v2.yml logs --tail=50; \
+	fi
+
+v2-shell:
+	@if [ -n "$(SERVICE)" ]; then \
+		docker exec -it ai-invest-$(SERVICE)-v2 /bin/bash; \
+	else \
+		echo "进入容器: make v2-shell SERVICE=app|postgres|scheduler"; \
+		docker exec -it ai-invest-app-v2 /bin/bash; \
+	fi
+
+# ======================
+# V2版本 - 数据库管理
+# ======================
+
+v2-db-init:
+	@echo "🗄️ 初始化V2数据库..."
+	docker exec -i ai-invest-postgres-v2 psql -U finance -d finance_v2 < src/db/schema_v2.sql
+	@echo "数据库初始化完成"
+
+v2-db-reset:
+	@echo "⚠️ 警告：这将清空V2数据库所有数据！"
+	@read -p "确认要重置数据库吗？(y/N): " confirm && [ "$$confirm" = "y" ] || { echo "操作已取消"; exit 1; }
+	@echo "重置V2数据库..."
+	@docker exec ai-invest-postgres-v2 psql -U finance -d finance_v2 -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+	@make v2-db-init
+	@echo "数据库已重置"
+
+v2-db-backup:
+	@echo "📦 备份V2数据库..."
+	@mkdir -p backups
+	docker exec ai-invest-postgres-v2 pg_dump -U finance finance_v2 > backups/finance_v2_$(shell date +%Y%m%d_%H%M%S).sql
+	@echo "备份完成: backups/finance_v2_$(shell date +%Y%m%d_%H%M%S).sql"
+
+v2-db-restore:
+	@if [ -z "$(BACKUP_FILE)" ]; then \
+		echo "使用方式: make v2-db-restore BACKUP_FILE=backups/finance_v2_20231031_120000.sql"; \
+		exit 1; \
+	fi
+	@echo "📥 恢复V2数据库..."
+	@make v2-db-reset
+	docker exec -i ai-invest-postgres-v2 psql -U finance -d finance_v2 < $(BACKUP_FILE)
+	@echo "数据库恢复完成"
+
+# ======================
+# V2版本 - 内容抓取和管理
+# ======================
+
+v2-crawl:
+	@if [ -z "$(URL)" ]; then \
+		echo "使用方式: make v2-crawl URL=https://example.com/news/article"; \
+		exit 1; \
+	fi
+	@echo "🕷️ 抓取文章: $(URL)"
+	@curl -X POST "http://localhost:8001/crawl?url=$(URL)" -H "Content-Type: application/json" | python3 -m json.tool
+
+v2-crawl-batch:
+	@echo "🕷️ 批量抓取高优先级新闻源..."
+	docker exec ai-invest-app-v2 python -m src.newspaper_crawler
+	@echo "批量抓取完成"
+
+v2-schedule-start:
+	@echo "⏰ 启动新闻调度器..."
+	docker exec -d ai-invest-scheduler-v2 python -m src.news_scheduler
+	@echo "调度器已启动"
+
+# ======================
+# V2版本 - 归档和清理
+# ======================
+
+v2-archive:
+	@echo "📁 执行文章归档..."
+	docker exec ai-invest-app-v2 python -m src.archive_manager --action archive
+	@echo "归档完成"
+
+v2-cleanup:
+	@echo "🧹 执行完整清理..."
+	docker exec ai-invest-app-v2 python -m src.archive_manager --action full
+	@echo "清理完成"
+
+v2-archive-stats:
+	@echo "📊 归档统计信息:"
+	@curl -s "http://localhost:8001/archive/stats" | python3 -m json.tool
+
+# ======================
+# V2版本 - API测试
+# ======================
+
+v2-test:
+	@echo "🧪 测试AI-Invest V2 API..."
+	@echo "1. 健康检查:"
+	@curl -s "http://localhost:8001/health" | python3 -m json.tool
+	@echo ""
+	@echo "2. 获取文章统计:"
+	@curl -s "http://localhost:8001/stats" | python3 -m json.tool
+	@echo ""
+	@echo "3. 获取分类列表:"
+	@curl -s "http://localhost:8001/categories" | python3 -m json.tool
+	@echo ""
+	@echo "4. 获取最新文章 (前3篇):"
+	@curl -s "http://localhost:8001/articles?limit=3" | python3 -m json.tool
+
+v2-test-search:
+	@if [ -z "$(Q)" ]; then \
+		echo "使用方式: make v2-test-search Q=SEC"; \
+		exit 1; \
+	fi
+	@echo "🔍 搜索测试: $(Q)"
+	@curl -s "http://localhost:8001/search?q=$(Q)&limit=5" | python3 -m json.tool
+
+v2-test-categories:
+	@echo "📂 按分类查询测试:"
+	@curl -s "http://localhost:8001/articles?category=regulation&limit=3" | python3 -m json.tool
+
+v2-test-importance:
+	@echo "⭐ 按重要性查询测试 (>80分):"
+	@curl -s "http://localhost:8001/articles?min_importance=80&limit=3" | python3 -m json.tool
+
+# ======================
+# V2版本 - 开发工具
+# ======================
+
+v2-dev-setup:
+	@echo "🛠️ 设置V2开发环境..."
+	pip install -r requirements.txt
+	@echo "开发环境设置完成"
+
+v2-dev-run-api:
+	@echo "🚀 启动V2开发API服务..."
+	@export POSTGRES_HOST=localhost && \
+	export POSTGRES_PORT=5433 && \
+	export POSTGRES_DB=finance_v2 && \
+	python -m src.api_v2
+
+v2-dev-run-scheduler:
+	@echo "⏰ 启动V2开发调度器..."
+	@export POSTGRES_HOST=localhost && \
+	export POSTGRES_PORT=5433 && \
+	export POSTGRES_DB=finance_v2 && \
+	python -m src.news_scheduler
+
+v2-dev-crawl:
+	@if [ -z "$(URL)" ]; then \
+		echo "使用方式: make v2-dev-crawl URL=https://example.com"; \
+		exit 1; \
+	fi
+	@export POSTGRES_HOST=localhost && \
+	export POSTGRES_PORT=5433 && \
+	export POSTGRES_DB=finance_v2 && \
+	python -m src.newspaper_crawler $(URL)
+
+# ======================
+# V2版本 - 清理和维护
+# ======================
+
+v2-clean:
+	@echo "🧹 清理V2相关资源..."
+	docker-compose -f docker-compose.v2.yml down -v
+	docker system prune -f
+	@echo "清理完成"
+
+v2-clean-all:
+	@echo "⚠️ 警告：这将删除所有V2数据和镜像！"
+	@read -p "确认要清理所有V2资源吗？(y/N): " confirm && [ "$$confirm" = "y" ] || { echo "操作已取消"; exit 1; }
+	docker-compose -f docker-compose.v2.yml down -v --rmi all
+	docker volume rm ai-invest_postgres_v2_data ai-invest_kafka_v2_data 2>/dev/null || true
+	rm -rf data/archives/* logs/*
+	@echo "所有V2资源已清理"
+
+# ======================
+# V2版本 - 帮助信息
+# ======================
+
+v2-help:
+	@echo "AI-Invest V2 管理命令："
+	@echo ""
+	@echo "基础服务:"
+	@echo "  v2-build        构建V2镜像"
+	@echo "  v2-up           启动V2服务"
+	@echo "  v2-down         停止V2服务"
+	@echo "  v2-restart      重启V2服务"
+	@echo "  v2-status       查看服务状态"
+	@echo "  v2-logs         查看日志 (SERVICE=服务名)"
+	@echo ""
+	@echo "数据库管理:"
+	@echo "  v2-db-init      初始化数据库"
+	@echo "  v2-db-reset     重置数据库"
+	@echo "  v2-db-backup    备份数据库"
+	@echo "  v2-db-restore   恢复数据库 (BACKUP_FILE=文件路径)"
+	@echo ""
+	@echo "内容抓取:"
+	@echo "  v2-crawl        抓取单篇文章 (URL=网址)"
+	@echo "  v2-crawl-batch  批量抓取"
+	@echo ""
+	@echo "归档清理:"
+	@echo "  v2-archive      执行归档"
+	@echo "  v2-cleanup      完整清理"
+	@echo "  v2-archive-stats 归档统计"
+	@echo ""
+	@echo "API测试:"
+	@echo "  v2-test         基础API测试"
+	@echo "  v2-test-search  搜索测试 (Q=关键词)"
+	@echo ""
+	@echo "开发工具:"
+	@echo "  v2-dev-setup    设置开发环境"
+	@echo "  v2-dev-run-api  启动开发API"
+	@echo ""
+	@echo "清理维护:"
+	@echo "  v2-clean        清理资源"
+	@echo "  v2-clean-all    清理所有资源"
+
+# 默认显示帮助
+v2:
+	@make v2-help
